@@ -64,7 +64,8 @@ class DoubleStreamBlock(OriginalDoubleStreamBlock):
         elif rave_options is not None:
             attn = rave_rope_attention(img_q, img_k, img_v, txt_q, txt_k, txt_v, pe, transformer_options, self.num_heads, 256)
         else:
-            attn = attention(q, k, v, heads=self.num_heads, pe=pe, mask=mask)
+            # Remove pe parameter and add mask as a keyword argument if it exists
+            attn = attention(q, k, v, mask) if mask is not None else attention(q, k, v)
 
         txt_attn, img_attn = attn[:, :txt.shape[1]], attn[:, txt.shape[1]:]
         txt_attn = txt_attn[0:1].repeat(img_attn.shape[0], 1, 1)
@@ -133,7 +134,8 @@ class SingleStreamBlock(OriginalSingleStreamBlock):
             
             attn = rave_rope_attention(img_q, img_k, img_v, txt_q, txt_k, txt_v, pe, transformer_options, self.num_heads, txt_split)
         else:
-            attn = attention(q, k, v, heads=self.num_heads, pe=pe, mask=mask)
+            # Remove pe parameter and add mask as a keyword argument if it exists
+            attn = attention(q, k, v, mask) if mask is not None else attention(q, k, v)
             
         _, img_attn = attn[:, :256], attn[:, 256:]
         attn[:, 256:] = img_attn
