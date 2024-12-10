@@ -9,6 +9,23 @@ from comfy.ldm.modules.attention import optimized_attention
 # Use optimized_attention as the attention function
 attention = optimized_attention
 
+def attention(q, k, v, heads=None, mask=None):
+    """
+    Wrapper for optimized attention with required heads parameter
+    """
+    if heads is None:
+        raise ValueError("heads parameter is required")
+    
+    # Get minimum sequence length
+    min_seq_len = min(q.shape[1], k.shape[1], v.shape[1])
+    
+    # Truncate to match minimum sequence length
+    q = q[:, :min_seq_len, :]
+    k = k[:, :min_seq_len, :]
+    v = v[:, :min_seq_len, :]
+    
+    return optimized_attention(q, k, v, heads=heads, skip_reshape=True, mask=mask)
+
 
 class DoubleStreamBlock(OriginalDoubleStreamBlock):
     def forward(self, img, txt, vec, pe, ref_config=None, timestep=None, transformer_options={}):
@@ -65,7 +82,7 @@ class DoubleStreamBlock(OriginalDoubleStreamBlock):
             attn = rave_rope_attention(img_q, img_k, img_v, txt_q, txt_k, txt_v, pe, transformer_options, self.num_heads, 256)
         else:
             # Remove pe parameter and add mask as a keyword argument if it exists
-            attn = attention(q, k, v, mask) if mask is not None else attention(q, k, v)
+            attn = attention(q, k, v, heads=self.num_heads, mask=mask) if mask is not None else attention(q, k, v, heads=self.num_heads)
 
         txt_attn, img_attn = attn[:, :txt.shape[1]], attn[:, txt.shape[1]:]
         txt_attn = txt_attn[0:1].repeat(img_attn.shape[0], 1, 1)
@@ -135,7 +152,7 @@ class SingleStreamBlock(OriginalSingleStreamBlock):
             attn = rave_rope_attention(img_q, img_k, img_v, txt_q, txt_k, txt_v, pe, transformer_options, self.num_heads, txt_split)
         else:
             # Remove pe parameter and add mask as a keyword argument if it exists
-            attn = attention(q, k, v, mask) if mask is not None else attention(q, k, v)
+            attn = attention(q, k, v, heads=self.num_heads, mask=mask) if mask is not None else attention(q, k, v, heads=self.num_heads)
             
         _, img_attn = attn[:, :256], attn[:, 256:]
         attn[:, 256:] = img_attn
