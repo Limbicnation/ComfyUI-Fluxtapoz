@@ -16,17 +16,22 @@ def apply_rope_single(xq: Tensor, freqs_cis: Tensor):
     return xq_out.reshape(*xq.shape).type_as(xq)
 
 
-def attention(q: Tensor, k: Tensor, v: Tensor, pe: Tensor, skip_rope: bool= False, k_pe=None, mask=None) -> Tensor:
-    if not skip_rope:
-        q_pe = pe
-        q = apply_rope_single(q, q_pe)
-
-    if k_pe is None:
-        k_pe = pe   
-    k = apply_rope_single(k, k_pe)
-    heads = q.shape[1]
+def attention(q, k, v, pe=None, mask=None, skip_rope=False, k_pe=None):
+    # Get minimum sequence length
+    min_seq_len = min(q.shape[1], k.shape[1], v.shape[1])
+    
+    # Truncate to match minimum sequence length
+    q = q[:, :min_seq_len, :]
+    k = k[:, :min_seq_len, :]
+    v = v[:, :min_seq_len, :]
+    
+    if pe is not None:
+        pe = pe[:, :min_seq_len, :]
+    if k_pe is not None:
+        k_pe = k_pe[:, :min_seq_len, :]
+    
+    # Now call optimized attention with matched sequence lengths
     x = optimized_attention(q, k, v, heads, skip_reshape=True, mask=mask)
-
     return x
 
 
